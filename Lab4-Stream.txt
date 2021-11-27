@@ -1,0 +1,123 @@
+
+1. open cmd
+
+2. run these
+	
+	"C:\Program Files\MongoDB\Server\5.0\bin\mongod.exe" --dbpath="c:\data\db"
+
+3. open MongoDBCompass
+
+4. type this
+	mongodb://localhost
+  and press connect
+
+5. create database
+    database name: timeseriesdemo
+    collection name: weather
+    time series: checked
+    time field: ts
+
+6. change directory to the python file
+
+7. new cmd:  > python stream.py
+
+if got [ModuleNotFoundError: No module named 'pymongo']
+>> pip install pymongo
+then repeat last command
+
+8. go to your database in compass left bar, click find button to see it's being updated each second.
+
+9. click on Aggregations to make pipeline
+
+10. create another collection called: weather_10s
+
+11. first: choose 
+
+    $project
+
+type these:
+
+{
+  "ts": {$dateToParts: {"date": "$ts"}},
+  "source":1,
+  "temp":1,
+  "windSpeed":1,
+}
+
+    $group
+
+type these:
+
+{
+  _id: {
+  source: "$source",
+  year: "$ts.year",
+  month: "$ts.month",
+  day: "$ts.day",
+  hour: "$ts.hour",
+  minute: "$ts.minute",
+  second: {$multiply: [{$floor: {$divide: ["$ts.second", 5]}}, 5]},
+  },
+  avgTemp: {$avg: "$temp"},
+  avgWindSpeed: {$avg: "$windSpeed"},
+}
+
+
+    $project
+
+type these:
+
+{
+  "_id": 0,
+  "source": "$_id.source",
+  "temp": {"$round": ["$avgTemp", 1]},
+  "windSpeed": {"$round": ["$avgWindSpeed", 1]},
+  "ts": {
+    "$dateFromParts": {
+      "year": "$_id.year",
+      "month": "$_id.month",
+      "day": "$_id.day",
+      "hour": "$_id.hour",
+      "minute":"$_id.minute",
+      "second": "$_id.second",
+    }
+  }
+}
+
+
+# Make $out instead of $merge, look at the next one after merge
+
+    $merge
+
+type these:
+
+{
+  into: 'weather_10s',
+  whenMatched: 'replace',
+  whenNotMatched: 'insert'
+}
+
+#################
+
+for me, I replaced merge as I didn't put anything to weather_10s collection to be merged
+
+so replace it with 
+
+$out
+
+and just type this:
+
+'weather_10s'
+
+>> this will write the output to the collection
+
+
+
+12. export, double check, copy code and put it in file out_stream.py and add this line at first
+
+	from pymongo import MongoClient
+
+13. goto new cmd: > python out_stream.py
+
+so to check go to this collection, it's not empty anymore.
+
